@@ -1,0 +1,78 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.ensemble import RandomForestRegressor
+
+data = pd.read_csv("DOGE-USD.csv")
+data.head()
+
+# # Now, let’s check the correlation
+data.corr()
+
+# Converting the string date & time in proper date & time format with the help of pandas. After that check is there any null value is present or not.
+data['Date'] = pd.to_datetime(data['Date'],
+                              infer_datetime_format=True)
+data.set_index('Date', inplace=True)
+
+data.isnull().any()
+
+# Now, let’s check for the presence of null values in the dataset.
+data.isnull().sum()
+# Dropping those missing values so that we do not have any errors while analyzing.
+data = data.dropna()
+# Now, check the statistical analysis of the data using describe() method.
+data.describe()
+# Now, firstly we will analyze the closing price as we need it to perform the prediction.
+
+plt.figure(figsize=(20, 7))
+x = data.groupby('Date')['Close'].mean()
+x.plot(linewidth=2.5, color='b')
+plt.xlabel('Date')
+plt.ylabel('Volume')
+plt.title("Date vs Close of 2021")
+
+# The column ‘Close’ is our predicted feature. We are taking different factors from the predefined factors for our own calculation and naming them suitably. Also, we are checking each factor while correlating with the ‘Close’ column while sorting it in descending order.
+
+data["gap"] = (data["High"] - data["Low"]) * data["Volume"]
+data["y"] = data["High"] / data["Volume"]
+data["z"] = data["Low"] / data["Volume"]
+data["a"] = data["High"] / data["Low"]
+data["b"] = (data["High"] / data["Low"]) * data["Volume"]
+abs(data.corr()["Close"].sort_values(ascending=False))
+
+# By, observing the correlating factors, we can choose a few of them. We are excluding High, Low, and Open as they are highly correlated from the beginning.
+
+data = data[["Close", "Volume", "gap", "a", "b"]]
+data.head()
+
+# Introducing the ARIMA model for Time Series Analysis. ARIMA stands for autoregressive integrated moving average model and is specified by three order parameters: (p, d, q) where AR stands for Autoregression i.e. p, I stands for Integration i.e. d, MA stands for Moving Average i.e. q. Whereas, SARIMAX is Seasonal ARIMA with exogenous variables.
+
+df2 = data.tail(30)
+train = df2[:11]
+test = df2[-19:]
+
+print(train.shape, test.shape)
+
+# The shape of the train is (11, 5), and the test is (19, 5). Let’s implement the SARIMAX model and see the results.
+
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+model = SARIMAX(endog=train["Close"], exog=train.drop(
+	"Close", axis=1), order=(2, 1, 1))
+results = model.fit()
+print(results.summary())
+
+# Now, observe the prediction in time series.
+
+start = 11
+end = 29
+predictions = results.predict(
+	start=start,
+	end=end,
+	exog=test.drop("Close", axis=1))
+predictions
+
+# Finally, plot the prediction to get a visualization.
+
+test["Close"].plot(legend=True, figsize=(12, 6))
+predictions.plot(label='TimeSeries', legend=True)
